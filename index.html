@@ -1,0 +1,1560 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>午夜档案 · 刑侦推理</title>
+<link rel="icon" href="data:,">
+<style>
+/* ============================================================
+   《夜间取证》全局样式
+   色调：暗色 / 低饱和（监控室氛围）
+   语义色：绿色=系统与状态  琥珀=线索  红=警告与录制
+   ============================================================ */
+:root{
+  --bg:#080b0d;
+  --panel:#0f1418; --panel2:#131a20;
+  --line:#222c33; --line2:#31404a;
+  --text:#b7c3c6; --dim:#71807f; --faint:#4a585f;
+  --green:#7fae8b; --green-soft:rgba(127,174,139,.13); --green-dim:#3a5245;
+  --amber:#c8ab77; --amber-soft:rgba(200,171,119,.12);
+  --red:#c06a58;
+  --serif:"KaiTi","STKaiti","BiauKai","FangSong",serif;            /* 标题以外：楷体 */
+  --font-title:"STXingkai","Xingkai SC","KaiTi","STKaiti",serif;   /* 大标题：行楷毛笔 */
+  --cream:#e6dcc6; --cream-dim:rgba(224,214,196,.6);
+  --blood:#a02c26; --blood-lit:#b04a40; --blood-dim:#5c1f1c;
+  --mono:Consolas,"Courier New",monospace;
+  --noise:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.6'/%3E%3C/svg%3E");
+}
+*{ margin:0; padding:0; box-sizing:border-box; }
+html,body{ height:100%; }
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:"Microsoft YaHei","Segoe UI",sans-serif;
+  font-size:14px;
+  min-width:1080px;
+  overflow-x:auto;
+  user-select:none;
+  -webkit-font-smoothing:antialiased;
+}
+/* 全局暗角 */
+body::after{
+  content:""; position:fixed; inset:0; pointer-events:none; z-index:1;
+  background:radial-gradient(ellipse at 50% 40%, transparent 55%, rgba(0,0,0,.42) 100%);
+}
+#app{ position:relative; z-index:2; height:100%; }
+
+/* ---------------- 通用 ---------------- */
+.mono{ font-family:var(--mono); }
+.hidden{ display:none !important; }
+.btn{
+  background:rgba(15,20,25,.85); border:1px solid #27313a; color:#cfc8b8;
+  padding:10px 26px; cursor:pointer; font-size:14px; letter-spacing:3px;
+  font-family:inherit; transition:border-color .15s, color .15s, background .15s;
+}
+.btn:hover{ border-color:#41505a; color:#eee7d6; background:#182028; }
+.btn:disabled{ opacity:.35; cursor:not-allowed; }
+.btn.primary{
+  color:#e3c8c2; border-color:rgba(160,44,38,.55); background:rgba(160,44,38,.13);
+}
+.btn.primary:hover{ color:#f2ddd8; border-color:rgba(178,58,50,.85); background:rgba(160,44,38,.22); }
+.btn.big{ padding:13px 42px; font-size:15px; letter-spacing:5px; }
+.btn.small{ padding:6px 12px; font-size:12px; letter-spacing:1px; }
+.badge{
+  display:inline-block; min-width:18px; text-align:center; margin-left:4px;
+  background:var(--amber-soft); color:var(--amber); border:1px solid rgba(200,171,119,.4);
+  font-family:var(--mono); font-size:11px; padding:0 4px; line-height:16px;
+}
+.badge.pulse{ animation:pulse .8s ease-out 1; }
+@keyframes pulse{
+  0%{ box-shadow:0 0 0 0 rgba(200,171,119,.55); }
+  100%{ box-shadow:0 0 0 12px rgba(200,171,119,0); }
+}
+
+/* ---------------- 视图路由 ---------------- */
+.view{ display:none; min-height:100%; position:relative; }
+.view.active{ display:flex; flex-direction:column; }
+#view-console.active{ height:100vh; overflow:hidden; }
+
+/* ============================================================
+   视图一：首页 / 关卡选择（影院式全屏氛围：背景图 + 文字菜单）
+   ============================================================ */
+#view-menu.active{ overflow:hidden; }
+.menu-bg{
+  position:absolute; inset:0; background-color:#070a0c;
+  background-size:cover; background-position:center;
+}
+.menu-bg::before{
+  content:""; position:absolute; inset:0; pointer-events:none;
+  background-image:var(--noise); background-size:180px; opacity:.05;
+}
+.menu-bg::after{
+  content:""; position:absolute; inset:0;
+  background:
+    linear-gradient(180deg, rgba(4,6,8,.78) 0%, rgba(4,6,8,.40) 42%, rgba(3,5,6,.92) 100%),
+    radial-gradient(ellipse at 50% 40%, transparent 40%, rgba(0,0,0,.62) 100%);
+}
+.menu-bg.missing{
+  background-image:
+    radial-gradient(ellipse at 72% 36%, rgba(160,44,38,.20), transparent 46%),
+    radial-gradient(ellipse at 18% 78%, rgba(217,192,140,.05), transparent 55%),
+    linear-gradient(180deg, #0a1014 0%, #060a0d 55%, #030507 100%);
+}
+.menu-bg.dim::after{
+  background: linear-gradient(180deg, rgba(4,6,8,.93), rgba(3,4,5,.98));
+}
+.menu-stage{
+  position:relative; z-index:2; flex:1; min-height:0; overflow-y:auto;
+  display:flex; flex-direction:column; align-items:center;
+  padding:3.5vh 48px 24px;
+}
+.menu-brand{
+  flex:none; display:flex; flex-direction:column; align-items:center; text-align:center;
+  transition:opacity .7s cubic-bezier(.55,.06,.68,.19), transform .7s cubic-bezier(.55,.06,.68,.19), filter .7s ease-in;
+  animation:brandIn .8s cubic-bezier(.2,.7,.3,1) backwards;
+}
+#menu-main{ animation:brandIn .8s .12s cubic-bezier(.2,.7,.3,1) backwards; }
+@keyframes brandIn{
+  from{ opacity:0; transform:translateY(18px); }
+  to{ opacity:1; transform:none; }
+}
+/* 标题画离场（点开始游戏时）：更深的模糊与更重的离场弧线 */
+.leaving{
+  opacity:0 !important; transform:translateY(-30px) scale(1.015); filter:blur(7px);
+}
+.menu-kicker{
+  font-family:var(--mono); font-size:12px; letter-spacing:7px;
+  color:var(--blood-lit);
+}
+.menu-title{
+  margin-top:22px;
+  font-family:var(--font-title);
+  font-size:clamp(56px, 7vw, 96px); font-weight:600;
+  letter-spacing:12px;
+  color:#e9dfc9; text-shadow:0 4px 44px rgba(0,0,0,.9);
+}
+.menu-logo{
+  display:block; height:clamp(340px, 64vh, 640px); width:auto; max-width:72vw;
+  margin-top:8px;
+  filter: drop-shadow(0 0 1px rgba(238,231,214,.35)) drop-shadow(0 0 34px rgba(238,231,214,.15));
+}
+.menu-sub{
+  margin-top:12px; display:flex; align-items:center; justify-content:center; gap:14px;
+  color:rgba(224,214,196,.55); letter-spacing:6px; font-size:14px;
+}
+.seal{
+  flex:none; width:32px; height:32px; display:inline-flex;
+  align-items:center; justify-content:center;
+  background:var(--blood); color:#f0e6d2; font-family:var(--serif);
+  font-size:18px; letter-spacing:0;
+  box-shadow:0 0 22px rgba(143,42,36,.45), inset 0 0 0 1px rgba(240,230,210,.25);
+}
+.menu-nav{
+  flex:none; margin-top:26px;
+  display:flex; align-items:center; justify-content:center; gap:72px;
+}
+.menu-item{
+  background:none; border:none; cursor:pointer;
+  font-family:var(--serif); font-size:26px; letter-spacing:8px;
+  color:rgba(224,214,196,.6); padding:9px 0; text-align:left;
+  transition:color .18s, text-shadow .18s;
+}
+.menu-item i{
+  font-style:normal; font-size:12px; color:var(--blood-lit);
+  opacity:.5; margin-right:14px; vertical-align:4px;
+  display:inline-block; transition:opacity .18s, transform .18s;
+}
+.menu-item:hover{ color:#f4ecda; text-shadow:0 0 20px rgba(233,223,201,.3); }
+.menu-item:hover i{ opacity:1; transform:translateX(3px); }
+.menu-item.back{ font-size:17px; color:rgba(224,214,196,.4); margin-top:26px; }
+.menu-item.back:hover{ color:rgba(244,236,218,.85); text-shadow:none; }
+.cases-kicker{
+  font-family:var(--mono); font-size:11px; letter-spacing:6px;
+  color:var(--blood-lit);
+}
+.cases-title{
+  font-family:var(--serif); font-size:34px; font-weight:600;
+  letter-spacing:16px; text-indent:16px; color:#e9dfc9;
+  margin:12px 0 24px; text-shadow:0 4px 30px rgba(0,0,0,.9);
+}
+#menu-cases{
+  flex-direction:column; align-items:center; width:min(600px, 100%); margin-top:7vh;
+  animation:casesIn .85s .12s cubic-bezier(.16,.8,.3,1) backwards;
+}
+@keyframes casesIn{
+  from{ opacity:0; transform:translateY(36px); }
+  to{ opacity:1; transform:none; }
+}
+/* 菜单页“换台”雪花闪屏 */
+#menu-flash{
+  position:fixed; inset:0; z-index:40; pointer-events:none; opacity:0;
+  background-color:#0a0d0c; background-image:var(--noise); background-size:130px;
+}
+#menu-flash.go{ animation:mflash .95s cubic-bezier(.3,0,.7,1) 1; }
+@keyframes mflash{ 0%{ opacity:.98; } 35%{ opacity:.5; } 100%{ opacity:0; } }
+.case-list{ display:flex; flex-direction:column; width:100%; }
+.case-row{
+  padding:15px 18px 14px; cursor:pointer;
+  border-left:2px solid transparent;
+  background:linear-gradient(90deg, rgba(9,12,14,.78), rgba(9,12,14,0) 82%);
+  transition:border-color .18s, background .18s;
+}
+.case-row:hover{
+  border-left-color:var(--blood-lit);
+  background:linear-gradient(90deg, rgba(26,13,12,.88), rgba(9,12,14,0) 82%);
+}
+.case-row.locked{ opacity:.38; cursor:not-allowed; }
+.case-row.locked:hover{ border-left-color:transparent; }
+.cr-main{ display:flex; align-items:baseline; gap:16px; }
+.cr-no{ font-family:var(--mono); font-size:11px; letter-spacing:2px; color:var(--blood-lit); opacity:.85; }
+.cr-name{
+  font-family:var(--serif); font-size:22px; letter-spacing:4px;
+  color:rgba(224,214,196,.78); transition:color .18s;
+}
+.case-row:hover .cr-name{ color:#f4ecda; }
+.cr-status{
+  margin-left:auto; font-family:var(--mono); font-size:12px; letter-spacing:2px;
+  color:rgba(224,214,196,.45);
+}
+.cr-status.st-locked{ color:#4a585f; }
+.cr-brief{ margin-top:7px; font-size:12.5px; line-height:1.8; color:rgba(160,152,138,.55); max-width:600px; }
+.cr-meta{ margin-top:6px; font-family:var(--mono); font-size:10.5px; letter-spacing:2px; color:#4a585f; }
+.menu-foot{
+  flex:none; margin-top:auto; width:100%;
+  display:flex; justify-content:space-between;
+  font-family:var(--mono); font-size:11px; letter-spacing:2px; color:#39454b;
+}
+
+/* ============================================================
+   视图二：关卡操作台
+   ============================================================ */
+#view-console{ background:var(--bg); }
+.topbar{
+  height:54px; flex:none; display:flex; align-items:center; gap:18px;
+  padding:0 16px; border-bottom:1px solid var(--line); background:var(--panel);
+  position:relative; z-index:10;
+}
+.case-title{ display:flex; align-items:baseline; gap:12px; }
+.ct-no{ font-family:var(--mono); font-size:11px; letter-spacing:2px; color:var(--blood-lit); }
+.ct-name{ font-family:var(--serif); font-size:16px; letter-spacing:3px; color:var(--cream); }
+.topbar-right{ margin-left:auto; display:flex; align-items:center; gap:8px; }
+.btn.icon{ padding:6px 10px; letter-spacing:0; }
+
+.console-body{ flex:1; display:flex; min-height:0; position:relative; }
+
+/* 左侧摄像头栏 */
+.cam-rail{
+  width:104px; flex:none; border-right:1px solid var(--line); background:var(--panel);
+  display:flex; flex-direction:column; padding:12px 10px; gap:8px; overflow-y:auto;
+}
+.rail-label{
+  font-family:var(--mono); font-size:10px; letter-spacing:3px; color:var(--faint);
+  margin:2px 0 4px; text-align:center;
+}
+.cam-btn{
+  background:#111820; border:1px solid #242f37; border-left:3px solid #2a353d;
+  color:var(--dim); padding:10px 6px 9px; cursor:pointer; text-align:left; font-family:inherit;
+  transition:all .15s;
+}
+.cam-btn:hover{ border-color:#3a4a52; color:var(--text); }
+.cam-btn.active{
+  border-left-color:var(--green); color:#dce8e2; background:var(--green-soft);
+  box-shadow:inset 0 0 18px rgba(127,174,139,.06);
+}
+.cam-btn .cam-id{ display:block; font-family:var(--mono); font-size:13px; letter-spacing:1px; }
+.cam-btn.active .cam-id{ color:var(--green); }
+.cam-btn .cam-name{ display:block; margin-top:3px; font-size:11px; color:var(--dim); line-height:1.5; }
+.cam-btn.active .cam-name{ color:#9db3a6; }
+
+/* 主监控区 */
+.monitor-col{ flex:1; display:flex; flex-direction:column; min-width:0; }
+.screen-wrap{ flex:1; min-height:0; display:flex; padding:16px; }
+#screen{
+  position:relative; flex:1; background:#04060a; overflow:hidden;
+  border:1px solid #1d262d; box-shadow:inset 0 0 60px rgba(0,0,0,.7);
+  cursor:crosshair;
+}
+#frame{ position:absolute; z-index:1; }
+#feed{ width:100%; height:100%; display:block; }
+/* 扫描线 + 暗角 + 微闪烁 */
+.fx-scan{
+  position:absolute; inset:0; z-index:2; pointer-events:none;
+  background:repeating-linear-gradient(0deg, rgba(0,0,0,.20) 0 1px, transparent 1px 3px);
+}
+.fx-vig{
+  position:absolute; inset:0; z-index:3; pointer-events:none;
+  background:radial-gradient(ellipse at center, transparent 52%, rgba(0,0,0,.5) 100%);
+}
+.fx-flick{
+  position:absolute; inset:0; z-index:3; pointer-events:none; background:#9fb8a8; opacity:0;
+  animation:flick 5s steps(1) infinite;
+}
+@keyframes flick{
+  0%,92%{ opacity:0; } 93%{ opacity:.015; } 94%{ opacity:0; } 96%{ opacity:.02; } 97%{ opacity:0; }
+}
+/* 角标烧录文字 */
+.burnin{
+  position:absolute; z-index:5; pointer-events:none;
+  font-family:var(--mono); font-size:14px; letter-spacing:1px;
+  color:rgba(207,230,212,.88); text-shadow:0 0 8px rgba(127,174,139,.45);
+}
+.b-tl{ top:10px; left:14px; } .b-tr{ top:10px; right:14px; }
+.b-bl{ bottom:10px; left:14px; font-size:11px; color:rgba(143,174,152,.55); }
+.b-br{ bottom:10px; right:14px; }
+.rec-dot{
+  display:inline-block; width:9px; height:9px; border-radius:50%;
+  background:var(--red); margin-right:6px; vertical-align:baseline;
+  animation:blink 1.2s steps(2) infinite;
+}
+@keyframes blink{ 50%{ opacity:.15; } }
+/* 线索标记层 */
+#markers{ position:absolute; inset:0; z-index:4; pointer-events:none; }
+.marker{ position:absolute; transform:translate(-50%,-50%); }
+.m-dot{
+  display:block; width:9px; height:9px; transform:rotate(45deg);
+  border:1.5px solid var(--amber); background:rgba(10,10,6,.5);
+  box-shadow:0 0 10px rgba(200,171,119,.5);
+}
+.m-tag{
+  position:absolute; left:14px; top:-7px; white-space:nowrap;
+  font-size:11px; letter-spacing:1px; color:var(--amber);
+  background:rgba(12,10,5,.88); border:1px solid rgba(200,171,119,.4);
+  padding:2px 7px;
+}
+.marker.new .m-tag{ animation:tagIn .4s ease-out 1; }
+@keyframes tagIn{ from{ opacity:0; transform:translateY(4px); } to{ opacity:1; } }
+.marker.dbg .m-ring{
+  display:block; width:26px; height:26px; border:1px dashed rgba(200,171,119,.7);
+  border-radius:50%; transform:translate(-8px,-8px);
+}
+/* 点击反馈波纹 */
+.ping{
+  position:fixed; z-index:90; width:30px; height:30px; border-radius:50%;
+  border:1px solid rgba(159,214,164,.85); pointer-events:none;
+  transform:translate(-50%,-50%) scale(.35); opacity:.9;
+  animation:ping .45s ease-out forwards;
+}
+@keyframes ping{ to{ transform:translate(-50%,-50%) scale(1.6); opacity:0; } }
+/* 无信号 */
+#no-signal{
+  position:absolute; inset:0; z-index:6; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:12px;
+  background-color:#05070a; background-image:var(--noise); background-size:140px;
+}
+.ns-big{
+  font-size:30px; letter-spacing:10px; color:#5d6f66;
+  text-shadow:0 0 14px rgba(127,174,139,.3);
+  animation:blink 1.6s steps(2) infinite;
+}
+.ns-sub{ font-size:12px; color:var(--faint); letter-spacing:1px; max-width:70%; text-align:center; line-height:1.8; }
+/* 切换信号时的雪花闪烁 */
+#static-flash{
+  position:absolute; inset:0; z-index:7; pointer-events:none; opacity:0;
+  background-color:#0a0d0c; background-image:var(--noise); background-size:120px;
+}
+#static-flash.go{ animation:sflash .22s linear 1; }
+@keyframes sflash{ 0%{ opacity:.85; } 100%{ opacity:0; } }
+/* 调试：坐标拾取 */
+#screen.debug::before{
+  content:""; position:absolute; inset:0; z-index:8; pointer-events:none;
+  background-image:
+    linear-gradient(rgba(127,174,139,.14) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(127,174,139,.14) 1px, transparent 1px);
+  background-size:10% 10%;
+}
+#dbg-readout{
+  position:absolute; top:40px; left:14px; z-index:9; pointer-events:none;
+  font-family:var(--mono); font-size:12px; color:var(--amber);
+  background:rgba(10,10,6,.85); border:1px solid rgba(200,171,119,.4); padding:4px 8px;
+}
+
+/* 时间轴 */
+.timeline{
+  flex:none; height:64px; border-top:1px solid var(--line); background:var(--panel);
+  display:flex; align-items:center; gap:10px; padding:0 16px;
+}
+.t-btn{
+  background:#111820; border:1px solid #242f37; color:var(--dim);
+  padding:7px 18px; cursor:pointer; font-family:inherit; text-align:center; transition:all .15s;
+}
+.t-btn:hover{ border-color:#3a4a52; color:var(--text); }
+.t-btn.active{
+  border-color:var(--green-dim); color:#dce8e2; background:var(--green-soft);
+}
+.t-time{ display:block; font-family:var(--mono); font-size:15px; letter-spacing:2px; }
+.t-btn.active .t-time{ color:var(--green); }
+.t-tag{ display:block; margin-top:1px; font-size:10px; color:var(--faint); letter-spacing:2px; }
+
+/* 底栏 */
+.bottombar{
+  flex:none; height:56px; border-top:1px solid var(--line); background:var(--panel);
+  display:flex; align-items:center; padding:0 20px; gap:16px;
+}
+#clue-progress{ font-family:var(--mono); font-size:12px; letter-spacing:2px; color:var(--dim); }
+#clue-progress b{ color:var(--amber); font-weight:normal; }
+.bottombar .spacer{ flex:1; }
+#btn-reason{ min-width:190px; }
+
+/* 右侧抽屉面板（证词 / 笔记） */
+#drawer{
+  position:absolute; top:0; right:0; bottom:0; width:390px; z-index:30;
+  background:var(--panel2); border-left:1px solid var(--line2);
+  transform:translateX(105%); transition:transform .25s ease;
+  display:flex; flex-direction:column;
+  box-shadow:-14px 0 34px rgba(0,0,0,.5);
+}
+#drawer.open{ transform:none; }
+.drawer-tabs{
+  flex:none; display:flex; align-items:center; border-bottom:1px solid var(--line);
+  background:var(--panel);
+}
+.drawer-tab{
+  flex:1; background:none; border:none; border-bottom:2px solid transparent;
+  color:var(--dim); padding:13px 0; cursor:pointer; font-size:13px; letter-spacing:2px;
+  font-family:inherit; transition:color .15s;
+}
+.drawer-tab:hover{ color:var(--text); }
+.drawer-tab.active{ color:var(--green); border-bottom-color:var(--green); }
+#drawer-close{
+  flex:none; width:44px; background:none; border:none; border-left:1px solid var(--line);
+  color:var(--dim); font-size:18px; cursor:pointer; padding:10px 0; font-family:inherit;
+}
+#drawer-close:hover{ color:var(--text); background:#182028; }
+.drawer-content{ flex:1; overflow-y:auto; padding:14px; }
+.tab-pane{ display:none; }
+.tab-pane.active{ display:block; }
+/* 质证与时间线 */
+.s-text .seg{
+  cursor:pointer; border-bottom:1px dotted rgba(160,180,170,.35);
+  padding-bottom:1px; transition:color .15s, border-color .15s;
+}
+.s-text .seg:hover{ color:#f0ead9; border-bottom-color:rgba(200,171,119,.7); }
+.s-text .seg.lie{ border-bottom:1px dashed rgba(192,106,88,.6); }
+.s-text .seg.lie.busted{
+  color:#d4675c; text-decoration:line-through; cursor:default;
+  border-bottom:1px solid rgba(178,58,50,.5);
+}
+.t-contradiction{
+  border:1px solid rgba(178,58,50,.45); background:rgba(160,44,38,.08);
+  color:var(--text); font-size:12px; letter-spacing:1px;
+  padding:9px 12px; margin-bottom:12px; line-height:1.7;
+}
+.t-contradiction b{ color:var(--amber); font-weight:normal; font-size:14px; }
+.tl-time{
+  font-family:var(--mono); font-size:12px; letter-spacing:2px; color:var(--green);
+  border-left:2px solid var(--green-dim); padding-left:10px; margin:16px 0 8px;
+}
+.tl-item{
+  display:flex; align-items:center; gap:10px; padding:7px 10px 7px 12px;
+  border-left:1px solid var(--line); margin-left:10px; font-size:13px; color:var(--text);
+}
+.tl-cam{ font-size:10.5px; color:var(--faint); flex:none; width:46px; }
+.tl-name{ letter-spacing:1px; }
+/* 多问题推理 */
+.q-num{ margin-top:20px; font-family:var(--mono); font-size:11px; letter-spacing:3px; color:var(--blood-lit); }
+.quiz-q.multi{ font-size:16.5px; margin-top:8px; }
+.q-opts{ display:flex; flex-direction:column; gap:8px; margin-top:12px; }
+.q-opts .opt-btn{ font-size:13.5px; padding:11px 16px; }
+.big-submit{ margin-top:24px; width:100%; letter-spacing:6px; }
+/* 证词条目 */
+.sus-item{
+  border:1px solid var(--line); border-left:3px solid var(--green-dim);
+  background:#10161b; padding:12px 14px; margin-bottom:10px;
+}
+.s-head{ display:flex; align-items:center; gap:10px; }
+.s-name{ font-size:15px; color:#d6e2dc; letter-spacing:2px; }
+.s-role{
+  font-size:11px; color:var(--dim); border:1px solid var(--line);
+  padding:1px 8px; letter-spacing:1px;
+}
+.s-text{ margin-top:8px; font-size:13px; line-height:1.9; color:var(--text); }
+/* 笔记条目 */
+.note-item{
+  border:1px solid rgba(200,171,119,.28); background:#141410;
+  padding:11px 13px; margin-bottom:10px;
+}
+.n-head{ display:flex; align-items:center; gap:10px; }
+.n-idx{ font-family:var(--mono); font-size:11px; color:var(--amber); opacity:.8; }
+.n-name{ font-size:14px; color:#e2d6b8; letter-spacing:1px; }
+.n-src{ margin-left:auto; font-family:var(--mono); font-size:10.5px; color:var(--faint); letter-spacing:1px; }
+.n-text{ margin-top:7px; font-size:13px; line-height:1.85; color:var(--text); }
+.empty-note{
+  margin-top:40px; text-align:center; color:var(--faint);
+  font-size:13px; line-height:2.2; letter-spacing:1px;
+}
+
+/* ============================================================
+   视图三：推理结算
+   ============================================================ */
+#view-result.active{ align-items:flex-start; overflow-y:auto; }
+.result-wrap{ position:relative; z-index:2; width:min(780px,94%); margin:auto; padding:56px 0 48px; }
+.result-head{
+  font-family:var(--mono); font-size:12px; letter-spacing:5px; color:var(--faint);
+  display:flex; align-items:center; gap:14px;
+}
+.result-head::after{ content:""; height:1px; background:var(--line); flex:1; }
+.quiz-box{
+  margin-top:22px; border:1px solid var(--line); background:rgba(13,18,22,.92); padding:26px 30px;
+}
+.quiz-q{
+  font-size:19px; letter-spacing:2px; color:var(--cream); line-height:1.8;
+  font-family:var(--serif);
+}
+#quiz-options{ margin-top:22px; display:flex; flex-direction:column; gap:10px; }
+.opt-btn{
+  display:flex; align-items:center; gap:16px; text-align:left;
+  background:#111820; border:1px solid #26313a; color:var(--text);
+  padding:14px 18px; cursor:pointer; font-size:14.5px; letter-spacing:1px;
+  font-family:inherit; transition:all .15s;
+}
+.opt-btn:hover:not(:disabled){ border-color:#4b5f58; background:#16202880; }
+.opt-btn:disabled{ cursor:default; opacity:.45; }
+.opt-btn.chosen{ opacity:1; border-color:var(--amber); background:var(--amber-soft); color:#e2d6b8; }
+.opt-letter{
+  flex:none; width:30px; height:30px; line-height:28px; text-align:center;
+  border:1px solid var(--line2); color:var(--dim); font-family:var(--mono); font-size:14px;
+}
+.opt-btn.chosen .opt-letter{ border-color:var(--amber); color:var(--amber); }
+#analyze{
+  margin-top:20px; text-align:center; color:#cfc6b2;
+  font-family:var(--mono); font-size:13px; letter-spacing:3px;
+}
+#analyze i{ animation:blink 1s steps(2) infinite; font-style:normal; }
+/* 结局 */
+#ending{ margin-top:26px; border:1px solid var(--line); background:var(--panel); padding:28px 30px; }
+.ending-badge{
+  display:inline-block; font-size:15px; letter-spacing:4px; padding:7px 18px;
+  border:1px solid; margin-bottom:18px;
+}
+.ending-badge.perfect{ color:#dccd97; border-color:rgba(220,205,151,.4); background:rgba(220,205,151,.08); }
+.ending-badge.partial{ color:#c8a06a; border-color:rgba(200,160,106,.4); background:rgba(200,160,106,.08); }
+.ending-badge.fail{ color:#d4675c; border-color:rgba(178,58,50,.45); background:rgba(160,44,38,.1); }
+#ending-text{ font-size:14.5px; line-height:2.15; color:var(--text); }
+#ending-stats{
+  margin-top:18px; padding-top:14px; border-top:1px dashed var(--line);
+  font-family:var(--mono); font-size:12px; letter-spacing:2px; color:var(--faint);
+}
+.ending-actions{ margin-top:24px; display:flex; gap:14px; justify-content:flex-end; }
+
+/* ---------------- 弹窗 ---------------- */
+#modal{ position:fixed; inset:0; z-index:100; }
+.modal-mask{ position:absolute; inset:0; background:rgba(2,4,5,.78); }
+.modal-box{
+  position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+  width:min(560px,92vw); max-height:82vh; overflow-y:auto;
+  background:var(--panel2); border:1px solid var(--line2); padding:26px 30px;
+  box-shadow:0 20px 60px rgba(0,0,0,.6);
+}
+.modal-title{
+  font-family:var(--mono); font-size:13px; letter-spacing:4px; color:var(--blood-lit);
+  padding-bottom:14px; border-bottom:1px solid var(--line);
+}
+.modal-body{ margin-top:16px; font-size:13.5px; line-height:2.1; color:var(--text); }
+.modal-actions{ margin-top:22px; display:flex; gap:12px; justify-content:flex-end; }
+.help-list{ padding-left:22px; }
+.help-list li{ margin-bottom:10px; }
+.help-list b{ color:#d6e2dc; font-weight:normal; }
+.help-tip{ margin-top:14px; color:var(--dim); font-size:12.5px; }
+
+/* ---------------- Toast ---------------- */
+#toast-box{
+  position:fixed; left:50%; bottom:76px; transform:translateX(-50%);
+  z-index:110; display:flex; flex-direction:column; align-items:center; gap:8px;
+  pointer-events:none;
+}
+.toast{
+  background:rgba(10,14,12,.94); border:1px solid var(--green-dim); color:#cfe0d4;
+  padding:9px 20px; font-size:13px; letter-spacing:2px;
+  opacity:0; transform:translateY(8px); transition:all .3s;
+  box-shadow:0 6px 20px rgba(0,0,0,.5);
+}
+.toast.show{ opacity:1; transform:none; }
+.toast.ok{ border-color:rgba(200,171,119,.5); color:#e2d6b8; }
+
+/* ---------------- 红丝线缠绕层（全页装饰） ---------------- */
+#thread-layer{
+  position:fixed; inset:0; z-index:3; pointer-events:none;
+  width:100%; height:100%;
+  opacity:.9; transition:opacity 1.3s ease .1s, visibility .7s, transform 2s cubic-bezier(.6,.05,.85,.4);
+  filter:drop-shadow(0 0 7px rgba(160,44,38,.45));
+}
+/* 红丝带飘走：加速离场，像被风整个拽走 */
+#thread-layer.away{ opacity:0; transform:translate3d(230px,-250px,0) rotate(3deg); }
+/* 红丝线仅首页显示，其他页面完全隐藏 */
+body:not([data-view="menu"]) #thread-layer{ opacity:0; visibility:hidden; }
+.thread-draw{
+  stroke-dasharray:1; stroke-dashoffset:1;
+  animation:threadDraw 2.4s .3s ease-out forwards;
+}
+@keyframes threadDraw{ to{ stroke-dashoffset:0; } }
+.thread-glint{
+  stroke-dasharray:.05 .95; stroke-dashoffset:0;
+  animation:glintMove 10s linear 3s infinite;
+}
+@keyframes glintMove{ to{ stroke-dashoffset:-1; } }
+@media (prefers-reduced-motion: reduce){
+  .thread-draw{ animation:none !important; stroke-dashoffset:0 !important; }
+  .thread-glint{ animation:none !important; }
+  #thread-layer .thread-bead{ display:none; }
+}
+
+/* ---------------- 滚动条 ---------------- */
+::-webkit-scrollbar{ width:8px; height:8px; }
+::-webkit-scrollbar-track{ background:#0b1013; }
+::-webkit-scrollbar-thumb{ background:#242f37; border:2px solid #0b1013; }
+::-webkit-scrollbar-thumb:hover{ background:#33424c; }
+</style>
+</head>
+<body data-view="menu">
+<div id="app">
+
+  <!-- ==================== 视图一：首页 / 关卡选择 ==================== -->
+  <section id="view-menu" class="view active">
+    <div class="menu-bg" id="menu-bg"></div>
+    <div class="menu-stage">
+      <header class="menu-brand" id="menu-brand">
+        <div class="menu-kicker">MIDNIGHT FILES · EVIDENCE UNIT</div>
+        <img id="menu-logo" class="menu-logo hidden" alt="午夜档案" draggable="false">
+        <h1 class="menu-title" id="menu-title">午夜档案</h1>
+        <div class="menu-sub"><span class="seal">档</span>刑侦推理 · 监控室探案</div>
+      </header>
+      <nav class="menu-nav" id="menu-main">
+        <button class="menu-item" id="mi-start"><i>◆</i>开始游戏</button>
+        <button class="menu-item" id="mi-help"><i>◆</i>游戏说明</button>
+      </nav>
+      <nav class="menu-nav hidden" id="menu-cases">
+        <div class="cases-kicker">MIDNIGHT FILES · CASE FILES</div>
+        <h2 class="cases-title">案 件 档 案</h2>
+        <div id="case-list" class="case-list"><!-- 案件条目由 JS 依据 levels.js 生成 --></div>
+        <button class="menu-item back" id="mi-back"><i>◆</i>返 回</button>
+      </nav>
+      <footer class="menu-foot"><span>BUILD 0.1 · NIGHT-01</span><span>画面与证词之外，无可信之物</span></footer>
+    </div>
+    <div id="menu-flash"></div>
+  </section>
+
+  <!-- ==================== 视图二：关卡操作台（所有关卡复用） ==================== -->
+  <section id="view-console" class="view">
+    <header class="topbar">
+      <button id="btn-back" class="btn small">‹ 返回菜单</button>
+      <div class="case-title">
+        <span class="ct-no" id="console-case-no">CASE FILE #01</span>
+        <span class="ct-name" id="console-case-name">—</span>
+      </div>
+      <div class="topbar-right">
+        <button id="btn-testimony" class="btn small">嫌疑人证词</button>
+        <button id="btn-notes" class="btn small">线索笔记<span class="badge" id="notes-badge">0</span></button>
+        <button id="btn-mute" class="btn small icon" title="音效开关">音效:开</button>
+        <button id="btn-help2" class="btn small icon" title="游戏说明">?</button>
+      </div>
+    </header>
+
+    <div class="console-body">
+      <!-- 面板②：摄像头切换 -->
+      <aside class="cam-rail">
+        <div class="rail-label">CAMERA</div>
+        <div id="cam-rail" style="display:contents"><!-- CAM 按钮由 JS 生成 --></div>
+      </aside>
+
+      <!-- 面板①：主监控画面 -->
+      <main class="monitor-col">
+        <div class="screen-wrap">
+          <div id="screen">
+            <div id="frame"><img id="feed" alt="监控画面" draggable="false">
+              <div id="markers"></div>
+            </div>
+            <div class="fx-scan"></div>
+            <div class="fx-vig"></div>
+            <div class="fx-flick"></div>
+            <div class="burnin b-tl" id="burnin-cam">CAM -- · ---</div>
+            <div class="burnin b-tr"><span class="rec-dot"></span>REC <span id="burnin-clock">--:--:--</span></div>
+            <div class="burnin b-bl">NIGHT MODE · CH 01 · 1080P · LOCAL FEED</div>
+            <div class="burnin b-br" id="burnin-time">PLAYBACK ◂◂ --:--</div>
+            <div id="no-signal" class="hidden">
+              <div class="ns-big">NO SIGNAL</div>
+              <div class="ns-sub" id="ns-msg">信号丢失</div>
+            </div>
+            <div id="static-flash"></div>
+            <div id="dbg-readout" class="hidden">x: --.-% &nbsp; y: --.-%</div>
+          </div>
+        </div>
+        <!-- 面板③：时间轴切换 -->
+        <div class="timeline">
+          <div class="rail-label" style="margin:0 6px 0 0;">TIMELINE</div>
+          <div id="timeline" style="display:contents"><!-- 时间按钮由 JS 生成 --></div>
+        </div>
+      </main>
+
+      <!-- 面板④：侧边抽屉（嫌疑人证词 / 线索笔记，共用一个抽屉，随时开收） -->
+      <aside id="drawer">
+        <div class="drawer-tabs">
+          <button class="drawer-tab" data-tab="testimony">嫌疑人证词</button>
+          <button class="drawer-tab" data-tab="notes">线索笔记<span class="badge" id="drawer-notes-badge">0</span></button>
+          <button class="drawer-tab" data-tab="timeline">时间线</button>
+          <button id="drawer-close" title="收起">×</button>
+        </div>
+        <div class="drawer-content">
+          <div id="tab-testimony" class="tab-pane"></div>
+          <div id="tab-notes" class="tab-pane"></div>
+          <div id="tab-timeline" class="tab-pane"></div>
+        </div>
+      </aside>
+    </div>
+
+    <footer class="bottombar">
+      <div id="clue-progress">已收集线索 <b>0/0</b></div>
+      <div class="spacer"></div>
+      <button id="btn-reason" class="btn primary">前往推理 ▸</button>
+    </footer>
+  </section>
+
+  <!-- ==================== 视图三：推理结算（所有关卡复用） ==================== -->
+  <section id="view-result" class="view">
+    <div class="menu-bg dim" id="result-bg"></div>
+    <div class="result-wrap">
+      <div class="result-head">REASONING · 推理结算</div>
+      <div class="quiz-box">
+        <div id="quiz-body"></div>
+        <div id="analyze" class="hidden">正在比对证词与线索<i> ▮</i></div>
+      </div>
+      <div id="ending" class="hidden">
+        <div class="ending-badge" id="ending-badge">—</div>
+        <div id="ending-text"></div>
+        <div id="ending-stats" class="mono"></div>
+        <div class="ending-actions">
+          <button id="btn-again" class="btn">重新调查</button>
+          <button id="btn-back-menu" class="btn primary">返回关卡选择</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- 红丝线缠绕层：缠绕全页的装饰丝线（不响应鼠标） -->
+<svg id="thread-layer" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+  <defs>
+    <linearGradient id="threadGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0"   stop-color="#6d1f1a"/>
+      <stop offset="0.5" stop-color="#b03530"/>
+      <stop offset="1"   stop-color="#7a241f"/>
+    </linearGradient>
+    <filter id="threadBlur" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="5"/>
+    </filter>
+  </defs>
+  <!-- 光晕层 -->
+  <path class="thread-draw" d="M -60 150 C 180 70, 380 110, 450 240 C 500 345, 430 430, 340 385 C 265 345, 305 225, 430 205 C 620 178, 700 80, 920 100 C 1120 120, 1210 250, 1110 330 C 1020 398, 905 355, 955 265 C 998 190, 1140 185, 1240 255 C 1390 360, 1460 510, 1365 635 C 1295 728, 1150 745, 1080 685 C 1030 640, 1060 555, 1180 565 C 1360 583, 1510 640, 1660 705"
+    pathLength="1" fill="none" stroke="#a02c26" stroke-width="7" opacity="0.5" filter="url(#threadBlur)"/>
+  <!-- 丝线主体 -->
+  <path id="threadPath" class="thread-draw" d="M -60 150 C 180 70, 380 110, 450 240 C 500 345, 430 430, 340 385 C 265 345, 305 225, 430 205 C 620 178, 700 80, 920 100 C 1120 120, 1210 250, 1110 330 C 1020 398, 905 355, 955 265 C 998 190, 1140 185, 1240 255 C 1390 360, 1460 510, 1365 635 C 1295 728, 1150 745, 1080 685 C 1030 640, 1060 555, 1180 565 C 1360 583, 1510 640, 1660 705"
+    pathLength="1" fill="none" stroke="url(#threadGrad)" stroke-width="2" stroke-linecap="round"/>
+  <!-- 沿线滑行的微光 -->
+  <path class="thread-glint" d="M -60 150 C 180 70, 380 110, 450 240 C 500 345, 430 430, 340 385 C 265 345, 305 225, 430 205 C 620 178, 700 80, 920 100 C 1120 120, 1210 250, 1110 330 C 1020 398, 905 355, 955 265 C 998 190, 1140 185, 1240 255 C 1390 360, 1460 510, 1365 635 C 1295 728, 1150 745, 1080 685 C 1030 640, 1060 555, 1180 565 C 1360 583, 1510 640, 1660 705"
+    pathLength="1" fill="none" stroke="#e8654f" stroke-width="1.3" stroke-linecap="round" opacity="0.85"/>
+  <!-- 沿线巡游的红珠 -->
+  <g class="thread-bead">
+    <circle r="7" fill="#e05a4e" opacity="0.28"/>
+    <circle r="3" fill="#f2c9c0" opacity="0.9"/>
+    <animateMotion dur="30s" repeatCount="indefinite" rotate="0">
+      <mpath href="#threadPath"/>
+    </animateMotion>
+  </g>
+</svg>
+
+<!-- 弹窗（游戏说明 / 确认框，共用） -->
+<div id="modal" class="hidden">
+  <div class="modal-mask" id="modal-mask"></div>
+  <div class="modal-box">
+    <div class="modal-title" id="modal-title">—</div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-actions" id="modal-actions"></div>
+  </div>
+</div>
+<div id="toast-box"></div>
+
+<noscript>本游戏需要启用 JavaScript。</noscript>
+
+<!-- 关卡数据（所有案件内容都在这里，与界面代码完全分离） -->
+<script src="js/levels.js"></script>
+<script>
+"use strict";
+/* ============================================================
+ * 《午夜档案》游戏引擎
+ * 案件数据全部来自 js/levels.js —— 新增关卡无需改动本文件。
+ * 模块：工具 → 音效 → 视图路由 → 首页菜单 → 关卡操作台 → 推理结算 → 弹窗/Toast → 调试 → 启动
+ * ============================================================ */
+
+/* ---------------- 工具 ---------------- */
+const $  = (sel, parent = document) => parent.querySelector(sel);
+const $$ = (sel, parent = document) => Array.from(parent.querySelectorAll(sel));
+function el(tag, cls, html){ const n = document.createElement(tag); if (cls) n.className = cls; if (html != null) n.innerHTML = html; return n; }
+const pad2 = (n) => String(n).padStart(2, "0");
+
+/* ---------------- 运行时状态（会话内存，不做持久化存档） ---------------- */
+const runtime = {
+  view: "menu",        // 当前视图：menu / console / result
+  levelId: null,       // 当前案件 id
+  progress: {},        // levelId -> { found:{线索序号:true}, cam, time, startedAt }
+  drawer: null,        // 当前打开的侧边面板：testimony / notes / null
+  debug: false,        // 坐标拾取模式（按 P 切换，供配置新线索用）
+  muted: false,
+  clockTimer: null,
+  feedReady: false,    // 主画面图片是否加载完成
+};
+const curLevel    = () => CASES.find(c => c.id === runtime.levelId) || null;
+const curProgress = () => runtime.progress[runtime.levelId] || null;
+
+/* ============================================================
+ * 音效模块（预留接口）
+ * 触发位置：camSwitch 切换摄像头 / timeSwitch 切换时间点 /
+ *          clueFound 发现线索 / panel 开关侧边面板 / reveal 结局揭晓 / click 通用按钮
+ * 文件路径统一在 levels.js 的 AUDIO_CONFIG 中配置；文件缺失时自动静音，不报错。
+ * ============================================================ */
+const AudioMgr = {
+  play(name){
+    if (runtime.muted) return;
+    const cfg = (typeof AUDIO_CONFIG !== "undefined") ? AUDIO_CONFIG : null;
+    const src = cfg ? cfg[name] : null;
+    if (!src) return;
+    try { const a = new Audio(src); a.volume = 0.55; a.play().catch(() => {}); }
+    catch (e) { /* 音频不可用时静默 */ }
+  }
+};
+
+/* ---------------- 视图路由 ---------------- */
+function showView(name){
+  $$(".view").forEach(v => v.classList.toggle("active", v.id === "view-" + name));
+  runtime.view = name;
+  document.body.dataset.view = name;   // 供红丝线等全局装饰层按页面调节浓度
+  if (name !== "console") stopClock();
+  window.scrollTo(0, 0);
+}
+
+/* ============================================================
+ * 首页 / 关卡选择菜单
+ * ============================================================ */
+function renderMenu(){
+  const list = $("#case-list");
+  list.innerHTML = "";
+  CASES.forEach((c, idx) => {
+    const locked = !!c.locked;
+    const p = runtime.progress[c.id];
+    const resumed = p && Object.keys(p.found).length > 0;
+    const cams = (c.cameras || []).length, times = (c.times || []).length, clues = (c.clues || []).length;
+    const row = el("div", "case-row" + (locked ? " locked" : ""));
+    row.innerHTML =
+      '<div class="cr-main">' +
+      '<span class="cr-no">CASE #' + pad2(idx + 1) + '</span>' +
+      '<span class="cr-name">' + c.name + '</span>' +
+      '<span class="cr-status ' + (locked ? "st-locked" : "st-open") + '">' +
+      (locked ? "未开放" : (resumed ? "继续调查 ▸" : "可调查 ▸")) + '</span></div>' +
+      '<div class="cr-brief">' + (c.brief || "") + '</div>' +
+      (cams ? '<div class="cr-meta">摄像头 ' + cams + ' · 时间点 ' + times + ' · 线索 ' + clues + '</div>' : '');
+    row.addEventListener("click", () => {
+      if (locked) { toast("该案件尚未开放，敬请期待"); return; }
+      AudioMgr.play("click");
+      startLevel(c.id);
+    });
+    list.appendChild(row);
+  });
+}
+
+/* 主菜单 ↔ 案件档案 两级导航
+   点「开始游戏」：换台雪花闪屏 + 标题画 blur 淡出 + 红丝带飘走 → 档案屏浮入
+   点「返回」：档案屏退场 → 标题画回归 + 丝线重新缠上（重播手绘动画） */
+function flashMenu(){
+  const f = $("#menu-flash");
+  f.classList.remove("go"); void f.offsetWidth; f.classList.add("go");
+}
+function showCasesNav(show){
+  const brand = $("#menu-brand"), main = $("#menu-main"), cases = $("#menu-cases"), tl = $("#thread-layer");
+  flashMenu();
+  if (show){
+    tl.classList.add("away");                       // 红丝带飘走（2s 加速离场）
+    brand.classList.add("leaving");
+    main.classList.add("leaving");
+    setTimeout(() => {
+      brand.classList.add("hidden");
+      main.classList.add("hidden");
+      brand.classList.remove("leaving");
+      main.classList.remove("leaving");
+      cases.classList.remove("hidden");             // 档案屏浮入（CSS 动画随 display 恢复自动播放）
+    }, 700);
+  } else {
+    tl.classList.remove("away");                    // 丝线飘回来重新缠上
+    $$(".thread-draw").forEach(p => { p.classList.remove("thread-draw"); void p.getBoundingClientRect(); p.classList.add("thread-draw"); });
+    cases.classList.add("leaving");
+    setTimeout(() => {
+      cases.classList.add("hidden");
+      cases.classList.remove("leaving");
+      brand.classList.remove("hidden");             // brandIn / casesIn 动画随 display 恢复自动重播
+      main.classList.remove("hidden");
+    }, 480);
+  }
+}
+
+/* 应用界面背景图 / 标题 Logo（路径来自 levels.js 的 UI_CONFIG；缺失时自动回退内置样式） */
+function applyUiBackgrounds(){
+  const cfg = (typeof UI_CONFIG !== "undefined") ? UI_CONFIG : null;
+
+  const els = [$("#menu-bg"), $("#result-bg")];
+  const src = cfg ? cfg.menuBg : null;
+  if (!src){ els.forEach(n => n && n.classList.add("missing")); }
+  else {
+    const probe = new Image();
+    probe.onload = () => els.forEach(n => { if (n) n.style.backgroundImage = 'url("' + src + '")'; });
+    probe.onerror = () => els.forEach(n => n && n.classList.add("missing"));
+    probe.src = src;
+  }
+
+  // 标题 Logo：加载成功显示图片、隐藏文字标题；失败则退回文字
+  const logoEl = $("#menu-logo"), titleEl = $("#menu-title");
+  const logoSrc = cfg ? cfg.titleLogo : null;
+  if (logoSrc){
+    logoEl.onload = () => { logoEl.classList.remove("hidden"); titleEl.classList.add("hidden"); };
+    logoEl.onerror = () => { logoEl.classList.add("hidden"); titleEl.classList.remove("hidden"); };
+    logoEl.src = logoSrc;
+  } else {
+    logoEl.classList.add("hidden");
+    titleEl.classList.remove("hidden");
+  }
+}
+
+/* ============================================================
+ * 关卡操作台
+ * ============================================================ */
+function startLevel(id, opts){
+  const reset = opts && opts.reset;
+  const lv = CASES.find(c => c.id === id);
+  if (!lv) return;
+  runtime.levelId = id;
+  if (reset || !runtime.progress[id]){
+    runtime.progress[id] = {
+      found: {},
+      lies: {},
+      cam: lv.cameras[0].id,
+      time: lv.times[0].label,
+      startedAt: Date.now(),
+    };
+  }
+  const p = runtime.progress[id];
+  // 校验进度中记录的摄像头 / 时间点仍然存在（防止配置修改后残留）
+  if (!lv.cameras.some(c => c.id === p.cam)) p.cam = lv.cameras[0].id;
+  if (!lv.times.some(t => t.label === p.time)) p.time = lv.times[0].label;
+
+  buildConsole(lv);
+  showView("console");
+  openDrawer("testimony", { silent: true });   // 进案默认展开证词面板
+  switchFeed(p.cam, p.time, null);             // 初次加载不播切换音效
+}
+
+/* 依据关卡配置构建操作台静态部分（摄像头按钮 / 时间轴 / 证词） */
+function buildConsole(lv){
+  $("#console-case-no").textContent = "CASE FILE #" + pad2(CASES.indexOf(lv) + 1);
+  $("#console-case-name").textContent = lv.name;
+
+  const rail = $("#cam-rail");
+  rail.innerHTML = "";
+  lv.cameras.forEach(cam => {
+    const b = el("button", "cam-btn");
+    b.dataset.cam = cam.id;
+    b.innerHTML = '<span class="cam-id">' + cam.id + '</span><span class="cam-name">' + cam.name + '</span>';
+    b.addEventListener("click", () => switchCam(cam.id));
+    rail.appendChild(b);
+  });
+
+  const tl = $("#timeline");
+  tl.innerHTML = "";
+  lv.times.forEach(t => {
+    const b = el("button", "t-btn");
+    b.dataset.time = t.label;
+    b.innerHTML = '<span class="t-time">' + t.label + '</span><span class="t-tag">' + (t.tag || "") + '</span>';
+    b.addEventListener("click", () => switchTime(t.label));
+    tl.appendChild(b);
+  });
+
+  renderTestimony(lv);
+  renderNotes();
+  renderTimeline();
+  updateProgress();
+}
+
+/* ---- 摄像头 / 时间切换 ---- */
+function switchCam(id){
+  const p = curProgress(); if (!p || p.cam === id) return;
+  switchFeed(id, p.time, "camSwitch");
+}
+function switchTime(t){
+  const p = curProgress(); if (!p || p.time === t) return;
+  switchFeed(p.cam, t, "timeSwitch");
+}
+function switchFeed(cam, time, sound){
+  const lv = curLevel(), p = curProgress(); if (!lv || !p) return;
+  p.cam = cam; p.time = time;
+  $$(".cam-btn").forEach(b => b.classList.toggle("active", b.dataset.cam === cam));
+  $$(".t-btn").forEach(b => b.classList.toggle("active", b.dataset.time === time));
+
+  const camObj = lv.cameras.find(c => c.id === cam) || { id: cam, name: "" };
+  const timeObj = lv.times.find(t => t.label === time) || { label: time, tag: "" };
+  // 图内已自带 CAM 编号时隐藏页面角标，避免重复
+  $("#burnin-cam").style.display = lv.camLabelBaked ? "none" : "";
+  if (!lv.camLabelBaked) $("#burnin-cam").textContent = camObj.id + " · " + camObj.name;
+  // 时段滤镜：同一张图在不同时间点呈现不同明暗
+  $("#feed").style.filter = timeObj.filter || "";
+  $("#burnin-time").textContent = "PLAYBACK ◂◂ " + time + (timeObj.tag ? " " + timeObj.tag : "");
+  restartClock();
+  if (sound){ AudioMgr.play(sound); flashStatic(); }
+  loadImage();
+}
+
+/* ---- 主画面图片加载（路径全部来自配置；缺失时显示 NO SIGNAL） ---- */
+function loadImage(){
+  const lv = curLevel(), p = curProgress(); if (!lv || !p) return;
+  const src = (lv.images && lv.images[p.cam] && lv.images[p.cam][p.time]) || "";
+  runtime.feedReady = false;
+  const frame = $("#frame"), feed = $("#feed");
+  $("#markers").innerHTML = "";
+  if (!src){
+    feed.removeAttribute("src");
+    frame.style.display = "none";
+    showNoSignal("该时间点未配置图片路径，请在 js/levels.js 的 images 中补充。");
+    return;
+  }
+  hideNoSignal();
+  feed.style.display = "none";
+  frame.style.display = "none";
+  feed.onload = () => {
+    feed.style.display = "block";
+    frame.style.display = "block";
+    fitImage();
+    runtime.feedReady = true;
+    renderMarkers();
+  };
+  feed.onerror = () => {
+    feed.style.display = "none";
+    frame.style.display = "none";
+    showNoSignal("图片加载失败：" + src + "<br>请确认文件存在，或修改 js/levels.js 中的路径。");
+  };
+  feed.src = src;
+}
+
+/* 将图片按原始比例 contain 适配进屏幕区（保证线索百分比坐标换算精确） */
+function fitImage(){
+  const screen = $("#screen"), frame = $("#frame"), feed = $("#feed");
+  const cw = screen.clientWidth, ch = screen.clientHeight;
+  const nw = feed.naturalWidth || 16, nh = feed.naturalHeight || 9;
+  const scale = Math.min(cw / nw, ch / nh);
+  const w = Math.round(nw * scale), h = Math.round(nh * scale);
+  frame.style.width = w + "px";
+  frame.style.height = h + "px";
+  frame.style.left = Math.round((cw - w) / 2) + "px";
+  frame.style.top = Math.round((ch - h) / 2) + "px";
+}
+window.addEventListener("resize", () => { if (runtime.view === "console") fitImage(); });
+
+function showNoSignal(msg){ $("#ns-msg").innerHTML = msg || "信号丢失"; $("#no-signal").classList.remove("hidden"); }
+function hideNoSignal(){ $("#no-signal").classList.add("hidden"); }
+function flashStatic(){
+  const f = $("#static-flash");
+  f.classList.remove("go"); void f.offsetWidth; f.classList.add("go");
+}
+
+/* ---- 监控画面上的“实时”时钟（从所选时间点起秒数递增） ---- */
+function restartClock(){
+  stopClock();
+  const p = curProgress(); if (!p) return;
+  const parts = p.time.split(":").map(Number);
+  const base = (parts[0] || 0) * 3600 + (parts[1] || 0) * 60;
+  let s = 0;
+  const tick = () => {
+    const total = base + s;
+    const hh = Math.floor(total / 3600) % 24, mm = Math.floor(total / 60) % 60, ss = total % 60;
+    $("#burnin-clock").textContent = pad2(hh) + ":" + pad2(mm) + ":" + pad2(ss);
+    s++;
+  };
+  tick();
+  runtime.clockTimer = setInterval(tick, 1000);
+}
+function stopClock(){ if (runtime.clockTimer){ clearInterval(runtime.clockTimer); runtime.clockTimer = null; } }
+
+/* ---- 线索标记（已收集的线索在对应画面留标记） ---- */
+function renderMarkers(){
+  const lv = curLevel(), p = curProgress();
+  const box = $("#markers");
+  if (!lv || !p || !box) return;
+  box.innerHTML = "";
+  if (!runtime.feedReady) return;
+  lv.clues.forEach((c, i) => {
+    const isCur = c.cam === p.cam && c.time === p.time;
+    if (!isCur) return;
+    if (p.found[i]){
+      const m = el("div", "marker new");
+      m.style.left = c.x + "%"; m.style.top = c.y + "%";
+      m.innerHTML = '<span class="m-dot"></span><span class="m-tag">已取证 · ' + (c.name || "线索") + '</span>';
+      box.appendChild(m);
+    } else if (runtime.debug){
+      const m = el("div", "marker dbg");
+      m.style.left = c.x + "%"; m.style.top = c.y + "%";
+      m.innerHTML = '<span class="m-ring"></span><span class="m-tag mono">' +
+        (p.found[i] ? "已收集" : "未收集") + ' · x:' + c.x + " y:" + c.y + '</span>';
+      box.appendChild(m);
+    }
+  });
+}
+
+/* ---- 画面点击检测：命中未收集线索 → 取证 ---- */
+$("#screen").addEventListener("click", (e) => {
+  if (runtime.view !== "console") return;
+  if (runtime.debug){ pickCoordinate(e); return; }
+  const lv = curLevel(), p = curProgress();
+  if (!lv || !p || !runtime.feedReady) return;
+  const frame = $("#frame"), r = frame.getBoundingClientRect();
+  const px = (e.clientX - r.left) / r.width * 100;
+  const py = (e.clientY - r.top) / r.height * 100;
+  ping(e.clientX, e.clientY);                       // 每次点击都有反馈波纹
+  if (px < 0 || px > 100 || py < 0 || py > 100) return;
+  let hit = -1;
+  for (let i = 0; i < lv.clues.length; i++){
+    const c = lv.clues[i];
+    if (c.cam !== p.cam || c.time !== p.time || p.found[i]) continue;
+    const dx = (c.x - px) / 100 * r.width;          // 容差换算为画面像素距离
+    const dy = (c.y - py) / 100 * r.height;
+    const tol = ((c.r == null ? 4 : c.r)) / 100 * r.width;
+    if (dx * dx + dy * dy <= tol * tol){ hit = i; break; }
+  }
+  if (hit >= 0) collectClue(hit);
+});
+function ping(x, y){
+  const d = el("div", "ping");
+  d.style.left = x + "px"; d.style.top = y + "px";
+  document.body.appendChild(d);
+  setTimeout(() => d.remove(), 500);
+}
+
+/* ---- 收集线索 ---- */
+function collectClue(i){
+  const lv = curLevel(), p = curProgress();
+  const c = lv.clues[i];
+  if (!c || p.found[i]) return;
+  p.found[i] = true;
+  AudioMgr.play("clueFound");
+  renderMarkers();
+  renderNotes();
+  renderTimeline();
+  updateProgress();
+  toast("取证成功 · " + (c.name || "线索") + (c.type === "decoy" ? "（存疑）" : ""), "ok");
+  const b = $("#btn-notes");
+  b.classList.remove("pulse"); void b.offsetWidth; b.classList.add("pulse");
+}
+
+/* ---- 侧边面板：证词（含质证玩法）/ 笔记 / 时间线 ---- */
+function totalLies(lv){
+  let n = 0;
+  (lv.suspects || []).forEach(s => {
+    if (Array.isArray(s.statement)) s.statement.forEach(sg => { if (sg.lie) n++; });
+  });
+  return n;
+}
+function renderTestimony(lv){
+  const pane = $("#tab-testimony");
+  pane.innerHTML = "";
+  const p = curProgress();
+  let lieTotal = 0, lieFound = 0;
+  (lv.suspects || []).forEach(s => {
+    const segs = Array.isArray(s.statement) ? s.statement : [{ t: s.statement || "" }];
+    const segHtml = segs.map((sg, k) => {
+      const key = s.name + "#" + k;
+      if (sg.lie){
+        lieTotal++;
+        const busted = p && p.lies && p.lies[key];
+        if (busted) lieFound++;
+        return '<span class="seg lie' + (busted ? " busted" : "") + '" data-key="' + key + '" title="点击质证">' + sg.t + '</span>';
+      }
+      return '<span class="seg" data-key="' + key + '">' + sg.t + '</span>';
+    }).join("");
+    pane.appendChild(el("div", "sus-item",
+      '<div class="s-head"><span class="s-name">' + s.name + '</span>' +
+      (s.role ? '<span class="s-role">' + s.role + '</span>' : "") + '</div>' +
+      '<div class="s-text">' + segHtml + '</div>'));
+  });
+  pane.insertBefore(el("div", "t-contradiction",
+    "证词矛盾 <b>" + lieFound + "/" + lieTotal + "</b> · 点击你认为说谎的片段进行质证（需有物证支撑，质证成功自动记入档案）"), pane.firstChild);
+  pane.querySelectorAll(".seg").forEach(seg => seg.addEventListener("click", () => challengeSeg(seg.dataset.key)));
+}
+/* 质证判定：片段是谎言 + 对应物证已收集 → 矛盾坐实；否则失败 */
+function challengeSeg(key){
+  const lv = curLevel(), p = curProgress();
+  if (!lv || !p) return;
+  if (p.lies[key]){ toast("该矛盾已坐实，无需重复质证"); return; }
+  const sName = key.split("#")[0];
+  const idx = parseInt(key.split("#")[1], 10);
+  const sus = (lv.suspects || []).find(s => s.name === sName);
+  const seg = sus && Array.isArray(sus.statement) ? sus.statement[idx] : null;
+  if (!seg){ toast("质证对象无效"); return; }
+  AudioMgr.play("click");
+  if (!seg.lie){
+    toast("质证不成立：该陈述与现有物证并无矛盾");
+    return;
+  }
+  const has = (seg.need || []).some(id => {
+    const i = lv.clues.findIndex(c => c.id === id);
+    return i >= 0 && p.found[i];
+  });
+  if (!has){
+    toast("质证失败：现有物证不足以支撑这项质疑，先回监控里找证据");
+    return;
+  }
+  p.lies[key] = true;
+  AudioMgr.play("clueFound");
+  renderTestimony(lv);
+  updateProgress();
+  showModal({
+    title: "质证成立 · 证词矛盾坐实",
+    html: "<b style='color:var(--amber)'>" + sName + "</b>：“" + seg.t.trim() + "”<br><br>" + (seg.why || ""),
+    actions: [{ label: "记入档案", primary: true }],
+  });
+}
+/* 时间线：已收集线索按时间点自动排列，拼出完整行动链 */
+function renderTimeline(){
+  const pane = $("#tab-timeline");
+  if (!pane) return;
+  const lv = curLevel(), p = curProgress();
+  pane.innerHTML = "";
+  if (!lv || !p) return;
+  let any = false;
+  (lv.times || []).forEach(t => {
+    const arr = lv.clues.filter((c, i) => c.time === t.label && p.found[i]);
+    if (!arr.length) return;
+    any = true;
+    pane.appendChild(el("div", "tl-time", "▸ " + t.label + (t.tag ? " · " + t.tag : "")));
+    arr.forEach(c => pane.appendChild(el("div", "tl-item",
+      '<span class="tl-cam">' + c.cam + '</span><span class="tl-name">' + (c.name || "线索") + '</span>')));
+  });
+  if (!any){
+    pane.appendChild(el("div", "empty-note",
+      "时间线还是空的。<br>收集到的线索会按时间点自动排列在这里，<br>帮你拼出完整的行动链。"));
+  }
+}
+function renderNotes(){
+  const lv = curLevel(), p = curProgress();
+  const pane = $("#tab-notes");
+  if (!lv || !p || !pane) return;
+  pane.innerHTML = "";
+  const got = [];
+  lv.clues.forEach((c, i) => { if (p.found[i]) got.push(c); });
+  if (!got.length){
+    pane.appendChild(el("div", "empty-note",
+      "—— 暂无线索 ——<br>仔细观察各监控画面，<br>点击画面中的可疑之处即可取证。"));
+    return;
+  }
+  got.forEach((c, k) => {
+    pane.appendChild(el("div", "note-item",
+      '<div class="n-head"><span class="n-idx">' + pad2(k + 1) + '</span>' +
+      '<span class="n-name">' + (c.name || "线索") + '</span>' +
+      '<span class="n-src">' + c.cam + ' · ' + c.time + '</span></div>' +
+      '<div class="n-text">' + (c.text || "") + '</div>'));
+  });
+}
+function updateProgress(){
+  const lv = curLevel(), p = curProgress();
+  if (!lv || !p) return;
+  const t = lv.clues.length, f = Object.keys(p.found).length;
+  const coreAll = lv.clues.filter(c => c.type === "core");
+  const coreFound = coreAll.filter(c => p.found[lv.clues.indexOf(c)]).length;
+  const lieTotal = totalLies(lv);
+  const lieFound = Object.keys(p.lies || {}).length;
+  let text;
+  if (coreAll.length){
+    text = "关键物证 <b>" + coreFound + "/" + coreAll.length + "</b>" +
+      (lieTotal ? " · 证词矛盾 <b>" + lieFound + "/" + lieTotal + "</b>" : "") +
+      " · 已收录 " + f;
+  } else {
+    text = "已收集线索 <b>" + f + "/" + t + "</b>";
+  }
+  $("#clue-progress").innerHTML = text;
+  $("#notes-badge").textContent = f;
+  $("#drawer-notes-badge").textContent = f;
+}
+
+/* ---- 抽屉开合 ---- */
+function openDrawer(tab, opts){
+  const silent = opts && opts.silent;
+  runtime.drawer = tab;
+  $("#drawer").classList.add("open");
+  $$(".drawer-tab").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+  $$(".tab-pane").forEach(pn => pn.classList.toggle("active", pn.id === "tab-" + tab));
+  if (!silent) AudioMgr.play("panel");
+}
+function closeDrawer(opts){
+  const silent = opts && opts.silent;
+  if (!runtime.drawer) return;
+  runtime.drawer = null;
+  $("#drawer").classList.remove("open");
+  if (!silent) AudioMgr.play("panel");
+}
+
+/* ============================================================
+ * 推理结算页
+ * ============================================================ */
+function showResultView(){
+  const lv = curLevel(); if (!lv) return;
+  stopClock();
+  closeDrawer({ silent: true });
+  const body = $("#quiz-body");
+  body.innerHTML = "";
+  $("#analyze").classList.add("hidden");
+  $("#ending").classList.add("hidden");
+  const letters = ["A", "B", "C", "D", "E", "F"];
+  const qs = lv.quiz.questions;
+  if (qs && qs.length){
+    /* 多问题模式：逐题作答，统一提交 */
+    runtime.quizChosen = new Array(qs.length).fill(-1);
+    qs.forEach((q, qi) => {
+      body.appendChild(el("div", "q-num", "问题 " + (qi + 1) + " / " + qs.length));
+      body.appendChild(el("div", "quiz-q multi", q.q));
+      const g = el("div", "q-opts");
+      q.options.forEach((o, oi) => {
+        const b = el("button", "opt-btn");
+        b.innerHTML = '<span class="opt-letter">' + (letters[oi] || "?") + '</span><span class="opt-text">' + o.text + '</span>';
+        b.addEventListener("click", () => {
+          runtime.quizChosen[qi] = oi;
+          Array.prototype.forEach.call(g.children, x => x.classList.remove("chosen"));
+          b.classList.add("chosen");
+        });
+        g.appendChild(b);
+      });
+      body.appendChild(g);
+    });
+    const sub = el("button", "btn primary big-submit", "提交推理结论 ▸");
+    sub.id = "btn-submit-quiz";
+    sub.addEventListener("click", submitQuiz);
+    body.appendChild(sub);
+  } else {
+    /* 单问题旧模式（兼容简单关卡） */
+    body.appendChild(el("div", "quiz-q", lv.quiz.question || ""));
+    const box = el("div", "q-opts");
+    (lv.quiz.options || []).forEach((o, i) => {
+      const b = el("button", "opt-btn");
+      b.innerHTML = '<span class="opt-letter">' + (letters[i] || "?") + '</span><span class="opt-text">' + o.text + '</span>';
+      b.addEventListener("click", () => chooseOption(i));
+      box.appendChild(b);
+    });
+    body.appendChild(box);
+  }
+  showView("result");
+}
+/* 三结局判定：多问题答对数 + 关键物证完整度 + 谎言识破度 */
+function computeEnding(lv, p){
+  const qs = lv.quiz.questions;
+  let correct = 0, firstCorrect = false;
+  qs.forEach((q, i) => {
+    const opt = q.options[runtime.quizChosen[i]];
+    if (opt && opt.correct){ correct++; if (i === 0) firstCorrect = true; }
+  });
+  const coreAll = lv.clues.filter(c => c.type === "core");
+  const coreFound = coreAll.filter(c => p.found[lv.clues.indexOf(c)]).length;
+  const lieTotal = totalLies(lv);
+  const lieFound = Object.keys(p.lies || {}).length;
+  const decoyAll = lv.clues.filter(c => c.type === "decoy");
+  const decoyFound = decoyAll.filter(c => p.found[lv.clues.indexOf(c)]).length;
+  let type = "fail";
+  if (firstCorrect && correct === qs.length && coreFound === coreAll.length && lieFound === lieTotal) type = "perfect";
+  else if (firstCorrect) type = "partial";
+  return { type, correct, qs: qs.length, coreFound, coreTotal: coreAll.length, lieFound, lieTotal, decoyFound, decoyTotal: decoyAll.length };
+}
+function submitQuiz(){
+  const lv = curLevel(), p = curProgress();
+  if (!lv || !p || !lv.quiz.questions) return;
+  if (runtime.quizChosen.some(v => v < 0)){ toast("还有问题未作答"); return; }
+  const r = computeEnding(lv, p);
+  $$(".opt-btn").forEach(b => b.disabled = true);
+  $("#btn-submit-quiz").disabled = true;
+  $("#analyze").classList.remove("hidden");
+  setTimeout(() => {
+    $("#analyze").classList.add("hidden");
+    const info = (lv.quiz.endings || {})[r.type] || {};
+    const sec = Math.max(0, Math.round((Date.now() - p.startedAt) / 1000));
+    const stats = "关键物证 " + r.coreFound + "/" + r.coreTotal +
+      " · 证词矛盾 " + r.lieFound + "/" + r.lieTotal +
+      (r.decoyTotal ? " · 干扰线索 " + r.decoyFound + "/" + r.decoyTotal : "") +
+      " · 问题答对 " + r.correct + "/" + r.qs +
+      " · 调查用时 " + Math.floor(sec / 60) + " 分 " + (sec % 60) + " 秒";
+    revealEnding(r.type, info.text || "", info.title || "", stats);
+  }, 1100);
+}
+function revealEnding(type, text, title, stats){
+  const badge = $("#ending-badge");
+  badge.className = "ending-badge " + type;
+  badge.textContent = title || (type === "perfect" ? "✔ 完美推理"
+                     : type === "partial" ? "▲ 部分正确" : "✕ 推理失败");
+  $("#ending-text").textContent = text;
+  $("#ending-stats").textContent = stats;
+  $("#ending").classList.remove("hidden");
+  AudioMgr.play("reveal");
+  $("#ending").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+function chooseOption(i){
+  const lv = curLevel(), p = curProgress();
+  const opt = lv.quiz.options[i];
+  $$(".opt-btn").forEach((b, k) => { b.disabled = true; b.classList.toggle("chosen", k === i); });
+  $("#analyze").classList.remove("hidden");
+  setTimeout(() => {
+    $("#analyze").classList.add("hidden");
+    const sec = Math.max(0, Math.round((Date.now() - p.startedAt) / 1000));
+    const t = lv.clues.length, f = Object.keys(p.found).length;
+    revealEnding(opt.type, opt.result, "", "线索收集 " + f + "/" + t + " · 调查用时 " +
+      Math.floor(sec / 60) + " 分 " + (sec % 60) + " 秒");
+  }, 1100);
+}
+
+/* ============================================================
+ * 弹窗 / Toast
+ * ============================================================ */
+function showModal(cfg){
+  $("#modal-title").textContent = cfg.title || "";
+  $("#modal-body").innerHTML = cfg.html || "";
+  const box = $("#modal-actions");
+  box.innerHTML = "";
+  (cfg.actions || [{ label: "知道了", primary: true }]).forEach(a => {
+    const b = el("button", "btn" + (a.primary ? " primary" : ""));
+    b.textContent = a.label;
+    b.addEventListener("click", () => { closeModal(); if (a.onClick) a.onClick(); });
+    box.appendChild(b);
+  });
+  $("#modal").classList.remove("hidden");
+}
+function closeModal(){ $("#modal").classList.add("hidden"); }
+
+function toast(msg, cls){
+  const box = $("#toast-box");
+  const t = el("div", "toast" + (cls ? " " + cls : ""), msg);
+  box.appendChild(t);
+  setTimeout(() => t.classList.add("show"), 10);
+  setTimeout(() => { t.classList.remove("show"); setTimeout(() => t.remove(), 320); }, 2400);
+}
+
+/* ---- 游戏说明 ---- */
+function showHelp(){
+  showModal({
+    title: "HOW TO PLAY · 游戏说明",
+    html:
+      '<ol class="help-list">' +
+      '<li><b>切换摄像头</b>：使用左侧 CAM01–CAM04 按钮，切换不同位置的监控探头；</li>' +
+      '<li><b>回放时间点</b>：使用画面下方时间轴，在案发前 / 案发时段 / 案发后之间回放；</li>' +
+      '<li><b>收集线索</b>：仔细观察画面，<b>点击可疑之处</b>即可取证。已收集的线索会在画面上留下标记，不会重复拾取；</li>' +
+      '<li><b>核对信息</b>：右上角随时打开【嫌疑人证词】与【线索笔记】，比对口供与证据中的矛盾；</li>' +
+      '<li><b>前往推理</b>：收集足够线索后点击【前往推理】，指认真凶——你的结论将决定结局。</li>' +
+      '</ol>' +
+      '<p class="help-tip">提示：线索可能藏在任何摄像头、任何时间点的画面细节里。多切换、多观察、多比对。</p>',
+  });
+}
+
+/* ============================================================
+ * 调试工具：坐标拾取模式（按 P 键开关，仅操作台生效）
+ * 用于配置新关卡时获取线索坐标：移动鼠标实时显示百分比坐标，
+ * 点击画面即复制“摄像头 / 时间点 / x / y”，可直接填入 levels.js。
+ * ============================================================ */
+function toggleDebug(){
+  runtime.debug = !runtime.debug;
+  $("#screen").classList.toggle("debug", runtime.debug);
+  $("#dbg-readout").classList.toggle("hidden", !runtime.debug);
+  renderMarkers();
+  toast(runtime.debug ? "坐标拾取模式：移动鼠标查看坐标，点击画面复制（再按 P 退出）" : "坐标拾取模式已关闭");
+}
+$("#screen").addEventListener("mousemove", (e) => {
+  if (!runtime.debug || runtime.view !== "console") return;
+  const r = $("#frame").getBoundingClientRect();
+  const px = (e.clientX - r.left) / r.width * 100;
+  const py = (e.clientY - r.top) / r.height * 100;
+  $("#dbg-readout").innerHTML = "x: " + px.toFixed(1) + "% &nbsp; y: " + py.toFixed(1) + "%";
+});
+function pickCoordinate(e){
+  const lv = curLevel(), p = curProgress();
+  if (!lv || !p) return;
+  const r = $("#frame").getBoundingClientRect();
+  const px = (e.clientX - r.left) / r.width * 100;
+  const py = (e.clientY - r.top) / r.height * 100;
+  if (px < 0 || px > 100 || py < 0 || py > 100){ toast("请点击画面范围内"); return; }
+  const text = p.cam + " · " + p.time + " · x: " + px.toFixed(1) + ", y: " + py.toFixed(1);
+  const json = '{ "cam": "' + p.cam + '", "time": "' + p.time + '", "x": ' + px.toFixed(1) + ', "y": ' + py.toFixed(1) + ' }';
+  console.log("[坐标拾取] " + json);
+  try { navigator.clipboard.writeText(json).catch(() => {}); } catch (err) {}
+  toast("已复制坐标 → " + text, "ok");
+}
+
+/* ---------------- 全局按键 ---------------- */
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape"){
+    closeModal();
+    closeDrawer();
+    if (runtime.view === "menu" && !$("#menu-cases").classList.contains("hidden")) showCasesNav(false);
+  }
+  if ((e.key === "p" || e.key === "P") && runtime.view === "console" && $("#modal").classList.contains("hidden")){
+    toggleDebug();
+  }
+});
+
+/* ---------------- 启动与事件绑定 ---------------- */
+function init(){
+  if (typeof CASES === "undefined"){
+    document.body.innerHTML = '<div style="padding:60px;color:#b7c3c6;font-size:15px;line-height:2">' +
+      '关卡配置加载失败：未找到 js/levels.js 或其中存在语法错误。<br>请检查该文件后刷新页面。</div>';
+    return;
+  }
+  renderMenu();
+  applyUiBackgrounds();
+
+  $("#mi-start").addEventListener("click", () => { AudioMgr.play("click"); showCasesNav(true); });
+  $("#mi-back").addEventListener("click", () => { AudioMgr.play("click"); showCasesNav(false); });
+  $("#mi-help").addEventListener("click", () => { AudioMgr.play("click"); showHelp(); });
+  $("#btn-help2").addEventListener("click", () => { AudioMgr.play("click"); showHelp(); });
+  $("#btn-back").addEventListener("click", () => { AudioMgr.play("click"); renderMenu(); showView("menu"); });
+  $("#btn-testimony").addEventListener("click", () => {
+    if (runtime.drawer === "testimony") closeDrawer(); else openDrawer("testimony");
+  });
+  $("#btn-notes").addEventListener("click", () => {
+    if (runtime.drawer === "notes") closeDrawer(); else openDrawer("notes");
+  });
+  $$(".drawer-tab").forEach(b => b.addEventListener("click", () => openDrawer(b.dataset.tab)));
+  $("#drawer-close").addEventListener("click", () => closeDrawer());
+  $("#modal-mask").addEventListener("click", closeModal);
+  $("#btn-reason").addEventListener("click", () => {
+    const lv = curLevel(), p = curProgress();
+    if (!lv) return;
+    AudioMgr.play("click");
+    const coreAll = lv.clues.filter(c => c.type === "core");
+    const coreFound = coreAll.filter(c => p.found[lv.clues.indexOf(c)]).length;
+    const lieTotal = totalLies(lv);
+    const lieFound = Object.keys(p.lies || {}).length;
+    const f = Object.keys(p.found).length, t = lv.clues.length;
+    const incomplete = coreAll.length ? (coreFound < coreAll.length || (lieTotal > 0 && lieFound < lieTotal))
+                                      : (f < t);
+    const prog = coreAll.length
+      ? "关键物证 " + coreFound + "/" + coreAll.length + " · 证词矛盾 " + lieFound + "/" + lieTotal + " · 已收录 " + f
+      : "线索 " + f + "/" + t;
+    if (incomplete){
+      showModal({
+        title: "CONFIRM · 前往推理确认",
+        html: "当前侦查进度 <b class='mono' style='color:var(--amber)'>" + prog + "</b>。<br>证据与矛盾尚未闭环，贸然推理可能影响结论。确定要前往推理吗？",
+        actions: [
+          { label: "返回调查" },
+          { label: "仍然前往", primary: true, onClick: showResultView },
+        ],
+      });
+    } else {
+      showResultView();
+    }
+  });
+  $("#btn-again").addEventListener("click", () => { AudioMgr.play("click"); startLevel(runtime.levelId, { reset: true }); });
+  $("#btn-back-menu").addEventListener("click", () => { AudioMgr.play("click"); renderMenu(); showView("menu"); });
+  $("#btn-mute").addEventListener("click", () => {
+    runtime.muted = !runtime.muted;
+    $("#btn-mute").textContent = runtime.muted ? "音效:关" : "音效:开";
+    if (!runtime.muted) AudioMgr.play("click");
+  });
+}
+document.addEventListener("DOMContentLoaded", init);
+</script>
+</body>
+</html>

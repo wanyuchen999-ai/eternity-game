@@ -1,0 +1,10 @@
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# 调试产物（非必需源文件）
+tools/src/ring_*
+tools/src/preview_*
+tools/src/new_*
+tools/src/ref*
